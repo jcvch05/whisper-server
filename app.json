@@ -1,0 +1,8 @@
+{
+  "android": {
+    "package": "com.anonymous.whisperserver"
+  },
+  "ios": {
+    "bundleIdentifier": "com.anonymous.whisperserver"
+  }
+}
