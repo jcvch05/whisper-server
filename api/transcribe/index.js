@@ -4,39 +4,30 @@ import fs from "fs";
 import https from "https";
 import OpenAI from "openai";
 import dotenv from "dotenv";
-import testOpenAIRouter from "../testOpenAI.js"; // ✅ Nuevo import del test endpoint
 
 dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 10000;
 
-// ✅ Añadimos el router de prueba antes de los endpoints principales
-app.use("/api", testOpenAIRouter);
-
-// Verifica que la API key esté disponible
-if (!process.env.OPENAI_API_KEY) {
-  console.error("❌ No se encontró OPENAI_API_KEY en .env ni en las variables de entorno");
-  process.exit(1);
-}
-
+// 🔐 Cliente OpenAI
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-  timeout: 60000, // 60 segundos
+  timeout: 120000, // 120 segundos
 });
 
-// Crea agente HTTPS con keep-alive
+// 🔁 Reutiliza conexión HTTPS
 const agent = new https.Agent({ keepAlive: true });
 
-// 🎙️ Endpoint principal de transcripción
+// 🎧 Endpoint principal
 app.post("/api/transcribe", (req, res) => {
   const form = formidable({ multiples: false });
 
-  console.log("🎧 Recibiendo archivo para transcribir...");
+  console.log("🎧 Recibiendo archivo...");
 
   form.parse(req, async (err, fields, files) => {
     if (err) {
-      console.error("❌ Error al procesar el archivo:", err);
+      console.error("❌ Error procesando archivo:", err);
       return res.status(400).json({ success: false, error: "Archivo inválido" });
     }
 
@@ -48,30 +39,44 @@ app.post("/api/transcribe", (req, res) => {
     console.log(`📄 Archivo recibido: ${file.originalFilename}`);
 
     try {
-      console.log("🎙️ Enviando archivo a Whisper...");
+      console.log("🎙️ Enviando a Whisper...");
+
       const response = await client.audio.transcriptions.create(
         {
           file: fs.createReadStream(file.filepath),
-          model: "gpt-4o-mini-transcribe", // También puedes probar con "whisper-1"
+          model: "whisper-1", // modelo probado y estable en Render
           response_format: "json",
         },
         { agent }
       );
 
       console.log("✅ Transcripción completa:", response.text);
-      res.status(200).json({ success: true, text: response.text });
+      res.json({ success: true, text: response.text });
     } catch (error) {
       console.error("❌ Error en la transcripción:", error);
       res.status(500).json({
         success: false,
         error: "Error en la transcripción",
-        details: error.message || error,
+        details: error.message || "Unknown error",
       });
     }
   });
 });
 
-// 🚀 Inicia el servidor
+// 🧪 Endpoint de prueba
+app.get("/api/testOpenAI", async (req, res) => {
+  try {
+    const models = await client.models.list();
+    res.json({
+      success: true,
+      message: "✅ Conexión exitosa con OpenAI",
+      models_count: models.data.length,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.listen(port, () => {
   console.log(`🟢 Whisper Server running on port ${port}`);
 });
