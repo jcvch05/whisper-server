@@ -4,15 +4,19 @@ import fs from "fs";
 import https from "https";
 import OpenAI from "openai";
 import dotenv from "dotenv";
+import testOpenAIRouter from "../testOpenAI.js"; // ✅ Nuevo import del test endpoint
 
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000; // 🔧 Puerto dinámico para Render
+const port = process.env.PORT || 3000;
+
+// ✅ Añadimos el router de prueba antes de los endpoints principales
+app.use("/api", testOpenAIRouter);
 
 // Verifica que la API key esté disponible
 if (!process.env.OPENAI_API_KEY) {
-  console.error("❌ No se encontró OPENAI_API_KEY en .env");
+  console.error("❌ No se encontró OPENAI_API_KEY en .env ni en las variables de entorno");
   process.exit(1);
 }
 
@@ -24,6 +28,7 @@ const client = new OpenAI({
 // Crea agente HTTPS con keep-alive
 const agent = new https.Agent({ keepAlive: true });
 
+// 🎙️ Endpoint principal de transcripción
 app.post("/api/transcribe", (req, res) => {
   const form = formidable({ multiples: false });
 
@@ -44,16 +49,13 @@ app.post("/api/transcribe", (req, res) => {
 
     try {
       console.log("🎙️ Enviando archivo a Whisper...");
-
       const response = await client.audio.transcriptions.create(
         {
           file: fs.createReadStream(file.filepath),
-          model: "gpt-4o-mini-transcribe", // o "whisper-1"
+          model: "gpt-4o-mini-transcribe", // También puedes probar con "whisper-1"
           response_format: "json",
         },
-        {
-          agent, // usa el agente HTTPS con keepAlive
-        }
+        { agent }
       );
 
       console.log("✅ Transcripción completa:", response.text);
@@ -69,7 +71,7 @@ app.post("/api/transcribe", (req, res) => {
   });
 });
 
-// 🔧 Escucha en puerto dinámico para Render
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`🟢 Whisper Server running on port ${PORT}`);
+// 🚀 Inicia el servidor
+app.listen(port, () => {
+  console.log(`🟢 Whisper Server running on port ${port}`);
 });
